@@ -31,7 +31,7 @@ impl From<hex::FromHexError> for PermitErr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct UserPermit {
     pub hwid: String,
     pub id: String,
@@ -122,9 +122,9 @@ mod tests {
             hwid: String::from("12ab5"),
             id: String::from("1254"),
         };
-        assert_eq!(up1.hwid, UserPermit::decrypt(up1.encrypt(key1)?, key1)?.hwid);
+        assert_eq!(up1, UserPermit::decrypt(up1.encrypt(key1)?, key1)?);
 
-        assert_eq!(up2.hwid, UserPermit::decrypt(up2.encrypt(key2)?, key2)?.hwid);
+        assert_eq!(up2, UserPermit::decrypt(up2.encrypt(key2)?, key2)?);
         Ok(())
     }
 }
