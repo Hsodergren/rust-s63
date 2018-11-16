@@ -138,4 +138,16 @@ mod tests {
         assert_eq!(expected, UserPermit::decrypt(up, key)?);
         Ok(())
     }
+
+    #[test]
+    fn encrypt() -> Result<(), PermitErr> {
+        let key = "10121";
+        let up = UserPermit {
+            hwid: String::from("12345"),
+            id: String::from("3130"),
+        };
+        let expected = "66B5CBFDF7E4139D5B6086C23130";
+        assert_eq!(expected, up.encrypt(key)?);
+        Ok(())
+    }
 }
