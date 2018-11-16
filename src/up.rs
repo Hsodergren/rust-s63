@@ -2,8 +2,9 @@
 
 
 use crypto::symmetriccipher::BlockDecryptor;
+use crypto::symmetriccipher::BlockEncryptor;
 use crypto::blowfish::Blowfish;
-use byteorder::{ReadBytesExt,BigEndian};
+use byteorder::{ReadBytesExt,BigEndian,WriteBytesExt};
 use hex;
 use crc;
 
@@ -57,7 +58,17 @@ impl UserPermit {
     }
 
     pub fn encrypt(&self, key: &str) -> Result<String,PermitErr> {
-        Ok(String::from(key))
+        check_key(key)?;
+        let c = Blowfish::new(key.as_bytes());
+        let enc = &mut [0u8; 8];
+        let mut data : Vec<u8> = Vec::with_capacity(8);
+        data.extend(self.hwid.as_bytes().iter().chain([3u8; 3].into_iter()));
+        c.encrypt_block(data.as_slice(), enc);
+        let enc_hwid = hex::encode_upper(enc);
+        let mut w = Vec::with_capacity(4);
+        w.write_u32::<BigEndian>(crc::crc32::checksum_ieee(enc_hwid.as_bytes())).unwrap();
+        let chksum = hex::encode_upper(w.as_slice());
+        Ok(enc_hwid + &chksum + &self.id)
     }
 }
 
