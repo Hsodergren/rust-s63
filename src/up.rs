@@ -9,17 +9,17 @@ use hex;
 use crc;
 
 
-const PERMIT_LENGTH : u8 = 16 + 8 + 4;
-const KEY_LENGTH : u8 = 5;
+const PERMIT_LENGTH : usize = 16 + 8 + 4;
+const KEY_LENGTH : usize = 5;
+const HWID_LENGTH : usize = 5;
+const ID_LENGTH : usize = 4;
 
 #[derive(Debug)]
 pub enum PermitErr {
     // the length of the hwid
     NonHex,
     // the length of the hwid
-    WrongUpLength(usize),
-    // the length of the key
-    WrongKeyLength(usize),
+    WrongLength(usize, usize),
     HashMisMatch,
     HexErr(hex::FromHexError),
 }
@@ -32,20 +32,25 @@ impl From<hex::FromHexError> for PermitErr {
 
 #[derive(Debug, PartialEq)]
 pub struct UserPermit {
-    pub hwid: String,
-    pub id: String,
+    hwid: String,
+    id: String,
 }
 
 impl UserPermit {
-    pub fn new(hwid: String, id: String) -> UserPermit {
-        UserPermit { hwid, id }
+    pub fn new(hwid: &str, id: &str) -> Result<UserPermit,PermitErr> {
+        validator(hwid, HWID_LENGTH)?;
+        validator(id, ID_LENGTH)?;
+        Ok(UserPermit {
+            hwid: String::from(hwid),
+            id: String::from(id) 
+        })
     }
 
     pub fn decrypt(up: &str, key: &str) -> Result<UserPermit,PermitErr> {
         if !up.chars().chain(key.chars()).all(is_hex) {
             return Err(PermitErr::NonHex);
         }
-        check_key(key)?;
+        validator(key, KEY_LENGTH)?;
         let (enc_hwid, _, id) = check_up_string(&up)?;
         let crypto = Blowfish::new(key.as_bytes());
         let enc = &mut [0u8; 8];
@@ -58,7 +63,7 @@ impl UserPermit {
     }
 
     pub fn encrypt(&self, key: &str) -> Result<String,PermitErr> {
-        check_key(key)?;
+        validator(key, KEY_LENGTH)?;
         let c = Blowfish::new(key.as_bytes());
         let enc = &mut [0u8; 8];
         let mut data : Vec<u8> = Vec::with_capacity(8);
@@ -83,11 +88,13 @@ fn is_hex(c : char) -> bool {
     }
 }
 
-// sanity checks the key
-fn check_key(key: &str) -> Result<(), PermitErr> {
-    let kl = key.len();
-    if kl != KEY_LENGTH as usize {
-        return Err(PermitErr::WrongKeyLength(kl));
+// checks length of string and that all characters are valid hex
+fn validator(a: &str, l: usize) -> Result<(), PermitErr> {
+    if a.len() != l {
+        return Err(PermitErr::WrongLength(a.len(), l));
+    }
+    if !a.chars().all(is_hex) {
+        return Err(PermitErr::NonHex);
     }
     Ok(())
 }
@@ -95,10 +102,7 @@ fn check_key(key: &str) -> Result<(), PermitErr> {
 // sanity checks the encrypted userpermit
 // returns the different parts of the encrypted
 fn check_up_string(up: &str) -> Result<(&str,&str,&str), PermitErr> {
-    let ul = up.len();
-    if ul != PERMIT_LENGTH as usize {
-        return Err(PermitErr::WrongUpLength(ul));
-    } 
+    validator(up, PERMIT_LENGTH)?;
     let (enc_hwid, chksum, id) = (&up[..16], &up[16..24], &up[24..]);
 
     let chksum_u32 = hex::decode(chksum)?.as_slice().read_u32::<BigEndian>().unwrap();
