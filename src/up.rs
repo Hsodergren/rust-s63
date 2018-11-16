@@ -1,13 +1,11 @@
 //! Package for handling user permits, both creating and decrypting
 
-extern crate crc;
-extern crate crypto;
-extern crate hex;
-extern crate byteorder;
 
-use up::crypto::symmetriccipher::BlockDecryptor;
-use up::crypto::blowfish::Blowfish;
-use self::byteorder::{ReadBytesExt,BigEndian};
+use crypto::symmetriccipher::BlockDecryptor;
+use crypto::blowfish::Blowfish;
+use byteorder::{ReadBytesExt,BigEndian};
+use hex;
+use crc;
 
 
 const PERMIT_LENGTH : u8 = 16 + 8 + 4;
@@ -90,7 +88,7 @@ fn check_up_string(up: &String) -> Result<(&str,&str,&str), PermitErr> {
     if ul != PERMIT_LENGTH as usize {
         return Err(PermitErr::WrongUpLength(ul));
     } 
-    let (enc_hwid, chksum, id) = (&up[0..16], &up[16..24], &up[24..28]);
+    let (enc_hwid, chksum, id) = (&up[..16], &up[16..24], &up[24..]);
 
     let chksum_u32 = hex::decode(chksum)?.as_slice().read_u32::<BigEndian>().unwrap();
 
