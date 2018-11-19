@@ -1,6 +1,8 @@
 use std::io::BufReader;
 use std::io::prelude::*;
 use chrono::prelude::*;
+use chrono::ParseError;
+use std::num::ParseIntError;
 use std::io;
 
 pub struct Permit {
@@ -10,22 +12,22 @@ pub struct Permit {
 }
 
 pub enum E {
-    InvalidDate(chrono::ParseError),
+    InvalidDate(ParseError),
     ParseError(usize, String),
     IoErr(io::Error),
-    ParseIntErr(std::num::ParseIntError)
+    ParseIntErr(ParseIntError)
 
 }
 
 
-impl From<chrono::ParseError> for E {
-    fn from(e: chrono::ParseError) -> E {
+impl From<ParseError> for E {
+    fn from(e: ParseError) -> E {
         E::InvalidDate(e)
     }
 }
 
-impl From<std::num::ParseIntError> for E {
-    fn from(e: std::num::ParseIntError) -> E {
+impl From<ParseIntError> for E {
+    fn from(e: ParseIntError) -> E {
         E::ParseIntErr(e)
     }
 }
