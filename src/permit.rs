@@ -11,6 +11,7 @@ pub struct Permit {
     pub key: String,
 }
 
+#[derive(Debug)]
 pub enum E {
     InvalidDate(ParseError),
     ParseError(usize, String),
@@ -39,7 +40,7 @@ impl From<io::Error> for E {
 }
 
 pub struct MetaData {
-    pub date: DateTime<FixedOffset>,
+    pub date: NaiveDateTime,
     pub version: u8,
 }
 
@@ -74,16 +75,20 @@ impl<R: Read> PermitFile<R> {
     }
 }
 
-fn get_date(l: &str) -> Result<DateTime<FixedOffset>, E> {
+fn get_date(l: &str) -> Result<NaiveDateTime, E> {
     let l = if l.starts_with(":DATE ") { 
         &l[6..] 
     } else { 
         return Err(E::ParseError(1, l.to_owned())) 
     };
+    println!("'{}'", l);
 
-    Ok(DateTime::parse_from_str(l, "%Y%m%d %H:%M").
-        or(DateTime::parse_from_str(l, "%Y%m%d"))?)
+    Ok(NaiveDateTime::parse_from_str(l, "%Y%m%d %H:%M").
+       or(NaiveDate::parse_from_str(l, "%Y%m%d").
+          map(|x| x.and_hms(0,0,0)))?
+       )
 }
+
 fn get_version(l: &str) -> Result<u8, E> {
     let l = if l.starts_with(":VERSION ") { 
         &l[9..] 
