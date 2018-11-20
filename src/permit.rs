@@ -8,7 +8,9 @@ use std::num::ParseIntError;
 pub struct Permit {
     pub cell: String,
     pub date: String,
-    pub key: String,
+    pub edition: String,
+    pub key1: String,
+    pub key2: String,
 }
 
 #[derive(Debug)]
@@ -54,6 +56,10 @@ impl<R: Read> Iterator for Permits<R> {
     fn next(&mut self) -> Option<Permit> {
         None
     }
+}
+
+fn parse_permit(s: &str) -> Result<Permit, E> {
+    unimplemented!()
 }
 
 impl<R: Read> PermitFile<R> {
@@ -131,6 +137,15 @@ mod tests {
             println!("test {}: {}", i, a.0);
             assert_eq!(get_version(a.0)?, a.1);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn parse_permit() -> Result<(), E> {
+        let p_str = "GB61021A200711301F3EC4E525FFFCEC1F3EC4E525FFFCEC3E91E355E4E82D30,0,,GB,";
+        let p = super::parse_permit(p_str)?;
+        assert_eq!(p.cell, "GB61021A");
+        assert_eq!(p.date, "20071130");
         Ok(())
     }
 }
