@@ -105,11 +105,11 @@ mod tests {
     use chrono::DateTime;
     #[test]
     fn read_date() -> Result<(), E> {
-        let a = vec![
+        let tests = vec![
             (":DATE 19990101 20:20",NaiveDate::from_ymd(1999,1,1).and_hms(20,20,0)),
             (":DATE 19990101", NaiveDate::from_ymd(1999,1,1).and_hms(0,0,0))
         ];
-        for (i, a) in a.iter().enumerate() {
+        for (i, a) in tests.iter().enumerate() {
             println!("test {}: {}", i, a.0);
             match get_date(a.0) {
                 Ok(val) => assert_eq!(val, a.1),
@@ -123,6 +123,16 @@ mod tests {
     }
 
     #[test]
-    fn read_permit() {
+    fn read_version() -> Result<(), E> {
+        let tests = vec![
+            (":VERSION 2", 2),
+            (":VERSION 123", 123)
+        ];
+
+        for (i, a) in tests.iter().enumerate() {
+            println!("test {}: {}", i, a.0);
+            assert_eq!(get_version(a.0)?, a.1);
+        }
+        Ok(())
     }
 }
