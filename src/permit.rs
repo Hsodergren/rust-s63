@@ -98,7 +98,6 @@ fn get_version(l: &str) -> Result<u8, E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::DateTime;
     #[test]
     fn read_date() -> Result<(), E> {
         let tests = vec![
