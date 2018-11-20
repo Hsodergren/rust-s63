@@ -98,3 +98,31 @@ fn get_version(l: &str) -> Result<u8, E> {
 
     Ok(l.parse()?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::DateTime;
+    #[test]
+    fn read_date() -> Result<(), E> {
+        let a = vec![
+            (":DATE 19990101 20:20",NaiveDate::from_ymd(1999,1,1).and_hms(20,20,0)),
+            (":DATE 19990101", NaiveDate::from_ymd(1999,1,1).and_hms(0,0,0))
+        ];
+        for (i, a) in a.iter().enumerate() {
+            println!("test {}: {}", i, a.0);
+            match get_date(a.0) {
+                Ok(val) => assert_eq!(val, a.1),
+                Err(e) => {
+                    println!("{:?}", e);
+                    return Err(e);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn read_permit() {
+    }
+}
