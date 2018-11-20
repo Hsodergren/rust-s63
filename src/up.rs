@@ -1,18 +1,16 @@
 //! Package for handling user permits, both creating and decrypting
 
-
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use crc;
+use crypto::blowfish::Blowfish;
 use crypto::symmetriccipher::BlockDecryptor;
 use crypto::symmetriccipher::BlockEncryptor;
-use crypto::blowfish::Blowfish;
-use byteorder::{ReadBytesExt,BigEndian,WriteBytesExt};
 use hex;
-use crc;
 
-
-const PERMIT_LENGTH : usize = 16 + 8 + 4;
-const KEY_LENGTH : usize = 5;
-const HWID_LENGTH : usize = 5;
-const ID_LENGTH : usize = 4;
+const PERMIT_LENGTH: usize = 16 + 8 + 4;
+const KEY_LENGTH: usize = 5;
+const HWID_LENGTH: usize = 5;
+const ID_LENGTH: usize = 4;
 
 #[derive(Debug)]
 pub enum PermitErr {
@@ -37,16 +35,16 @@ pub struct UserPermit {
 }
 
 impl UserPermit {
-    pub fn new(hwid: &str, id: &str) -> Result<UserPermit,PermitErr> {
+    pub fn new(hwid: &str, id: &str) -> Result<UserPermit, PermitErr> {
         validator(hwid, HWID_LENGTH)?;
         validator(id, ID_LENGTH)?;
         Ok(UserPermit {
             hwid: String::from(hwid),
-            id: String::from(id) 
+            id: String::from(id),
         })
     }
 
-    pub fn decrypt(up: &str, key: &str) -> Result<UserPermit,PermitErr> {
+    pub fn decrypt(up: &str, key: &str) -> Result<UserPermit, PermitErr> {
         if !up.chars().chain(key.chars()).all(is_hex) {
             return Err(PermitErr::NonHex);
         }
@@ -57,31 +55,30 @@ impl UserPermit {
         crypto.decrypt_block(hex::decode(enc_hwid)?.as_ref(), enc);
 
         Ok(UserPermit {
-            hwid : String::from_utf8(enc[0..5].into()).unwrap(),
-            id : String::from(id),
+            hwid: String::from_utf8(enc[0..5].into()).unwrap(),
+            id: String::from(id),
         })
     }
 
-    pub fn encrypt(&self, key: &str) -> Result<String,PermitErr> {
+    pub fn encrypt(&self, key: &str) -> Result<String, PermitErr> {
         validator(key, KEY_LENGTH)?;
         let c = Blowfish::new(key.as_bytes());
         let enc = &mut [0u8; 8];
-        let mut data : Vec<u8> = Vec::with_capacity(8);
+        let mut data: Vec<u8> = Vec::with_capacity(8);
         data.extend(self.hwid.as_bytes().iter().chain([3u8; 3].into_iter()));
         c.encrypt_block(data.as_slice(), enc);
         let enc_hwid = hex::encode_upper(enc);
         let mut w = Vec::with_capacity(4);
-        w.write_u32::<BigEndian>(crc::crc32::checksum_ieee(enc_hwid.as_bytes())).unwrap();
+        w.write_u32::<BigEndian>(crc::crc32::checksum_ieee(enc_hwid.as_bytes()))
+            .unwrap();
         let chksum = hex::encode_upper(w.as_slice());
         Ok(enc_hwid + &chksum + &self.id)
     }
 }
 
 // returns true if c is a valid hexadecimal character else false
-fn is_hex(c : char) -> bool {
-    if  (c >= '0' && c <= '9') || 
-        (c >= 'a' && c <= 'f') || 
-        (c >= 'A' && c <= 'F') {
+fn is_hex(c: char) -> bool {
+    if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
         true
     } else {
         false
@@ -101,18 +98,20 @@ fn validator(a: &str, l: usize) -> Result<(), PermitErr> {
 
 // sanity checks the encrypted userpermit
 // returns the different parts of the encrypted
-fn check_up_string(up: &str) -> Result<(&str,&str,&str), PermitErr> {
+fn check_up_string(up: &str) -> Result<(&str, &str, &str), PermitErr> {
     validator(up, PERMIT_LENGTH)?;
     let (enc_hwid, chksum, id) = (&up[..16], &up[16..24], &up[24..]);
 
-    let chksum_u32 = hex::decode(chksum)?.as_slice().read_u32::<BigEndian>().unwrap();
+    let chksum_u32 = hex::decode(chksum)?
+        .as_slice()
+        .read_u32::<BigEndian>()
+        .unwrap();
 
     if crc::crc32::checksum_ieee(enc_hwid.as_bytes()) != chksum_u32 {
         return Err(PermitErr::HashMisMatch);
     }
     Ok((enc_hwid, chksum, id))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -125,7 +124,7 @@ mod tests {
 
     // a user permit that gets encrypted and then decrypted should get back same result
     #[test]
-    fn encrypt_decrypt_test() -> Result<(),PermitErr> {
+    fn encrypt_decrypt_test() -> Result<(), PermitErr> {
         let key1 = "12345";
         let up1 = UserPermit {
             hwid: String::from("12345"),

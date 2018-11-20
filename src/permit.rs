@@ -1,9 +1,9 @@
-use std::io::BufReader;
-use std::io::prelude::*;
 use chrono::prelude::*;
 use chrono::ParseError;
-use std::num::ParseIntError;
 use std::io;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::num::ParseIntError;
 
 pub struct Permit {
     pub cell: String,
@@ -16,7 +16,7 @@ pub enum E {
     InvalidDate(ParseError),
     ParseError(usize, String),
     IoErr(io::Error),
-    ParseIntErr(ParseIntError)
+    ParseIntErr(ParseIntError),
 }
 
 impl From<ParseError> for E {
@@ -51,7 +51,7 @@ pub struct Permits<R: Read>(BufReader<R>);
 impl<R: Read> Iterator for Permits<R> {
     type Item = Permit;
 
-    fn next(&mut self) -> Option<Permit>{
+    fn next(&mut self) -> Option<Permit> {
         None
     }
 }
@@ -65,7 +65,7 @@ impl<R: Read> PermitFile<R> {
         rdr.read_line(&mut version_str)?;
         let version = get_version(&version_str)?;
 
-        Ok((MetaData{ date, version}, PermitFile{ file: rdr }))
+        Ok((MetaData { date, version }, PermitFile { file: rdr }))
     }
 
     pub fn permits(self) -> Permits<R> {
@@ -74,24 +74,22 @@ impl<R: Read> PermitFile<R> {
 }
 
 fn get_date(l: &str) -> Result<NaiveDateTime, E> {
-    let l = if l.starts_with(":DATE ") { 
-        &l[6..] 
-    } else { 
-        return Err(E::ParseError(1, l.to_owned())) 
+    let l = if l.starts_with(":DATE ") {
+        &l[6..]
+    } else {
+        return Err(E::ParseError(1, l.to_owned()));
     };
     println!("'{}'", l);
 
-    Ok(NaiveDateTime::parse_from_str(l, "%Y%m%d %H:%M").
-       or(NaiveDate::parse_from_str(l, "%Y%m%d").
-          map(|x| x.and_hms(0,0,0)))?
-       )
+    Ok(NaiveDateTime::parse_from_str(l, "%Y%m%d %H:%M")
+        .or(NaiveDate::parse_from_str(l, "%Y%m%d").map(|x| x.and_hms(0, 0, 0)))?)
 }
 
 fn get_version(l: &str) -> Result<u8, E> {
-    let l = if l.starts_with(":VERSION ") { 
-        &l[9..] 
-    } else { 
-        return Err(E::ParseError(2, l.to_owned())) 
+    let l = if l.starts_with(":VERSION ") {
+        &l[9..]
+    } else {
+        return Err(E::ParseError(2, l.to_owned()));
     };
 
     Ok(l.parse()?)
@@ -104,8 +102,14 @@ mod tests {
     #[test]
     fn read_date() -> Result<(), E> {
         let tests = vec![
-            (":DATE 19990101 20:20",NaiveDate::from_ymd(1999,1,1).and_hms(20,20,0)),
-            (":DATE 19990101", NaiveDate::from_ymd(1999,1,1).and_hms(0,0,0))
+            (
+                ":DATE 19990101 20:20",
+                NaiveDate::from_ymd(1999, 1, 1).and_hms(20, 20, 0),
+            ),
+            (
+                ":DATE 19990101",
+                NaiveDate::from_ymd(1999, 1, 1).and_hms(0, 0, 0),
+            ),
         ];
         for (i, a) in tests.iter().enumerate() {
             println!("test {}: {}", i, a.0);
@@ -122,10 +126,7 @@ mod tests {
 
     #[test]
     fn read_version() -> Result<(), E> {
-        let tests = vec![
-            (":VERSION 2", 2),
-            (":VERSION 123", 123)
-        ];
+        let tests = vec![(":VERSION 2", 2), (":VERSION 123", 123)];
 
         for (i, a) in tests.iter().enumerate() {
             println!("test {}: {}", i, a.0);
