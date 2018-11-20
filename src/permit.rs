@@ -17,9 +17,7 @@ pub enum E {
     ParseError(usize, String),
     IoErr(io::Error),
     ParseIntErr(ParseIntError)
-
 }
-
 
 impl From<ParseError> for E {
     fn from(e: ParseError) -> E {
