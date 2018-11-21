@@ -85,7 +85,6 @@ fn get_date(l: &str) -> Result<NaiveDateTime, E> {
     } else {
         return Err(E::ParseError(1, l.to_owned()));
     };
-    println!("'{}'", l);
 
     Ok(NaiveDateTime::parse_from_str(l, "%Y%m%d %H:%M")
         .or(NaiveDate::parse_from_str(l, "%Y%m%d").map(|x| x.and_hms(0, 0, 0)))?)
