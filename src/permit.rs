@@ -74,7 +74,7 @@ impl<R: Read> Iterator for Permits<R> {
         let res = match self.0.read_line(&mut s) {
             Ok(r) => match r {
                 0 => None,
-                _ => Some(parse_permit(&s)),
+                _ => Some(parse_permit(&s[..s.len() - 1])),
             },
             Err(e) => Some(Err(e.into())),
         };
@@ -103,8 +103,8 @@ fn parse_permit(s: &str) -> Result<PermitRecord, E> {
         "" => None,
         a => Some(a.parse()?),
     };
-    let data_server_id = String::from("");
-    let comment = String::from("");
+    let data_server_id = String::from(ss[3]);
+    let comment = String::from(ss[4]);
 
     Ok(PermitRecord {
         cell_permit,
@@ -138,9 +138,9 @@ impl<R: Read> PermitFile<R> {
         let mut rdr = BufReader::new(rdr);
         let (mut date_str, mut version_str) = (String::new(), String::new());
         rdr.read_line(&mut date_str)?;
-        let date = get_date(&date_str)?;
+        let date = get_date(&date_str[..date_str.len() - 1])?;
         rdr.read_line(&mut version_str)?;
-        let version = get_version(&version_str)?;
+        let version = get_version(&version_str[..version_str.len() - 1])?;
 
         Ok((MetaData { date, version }, PermitFile { file: rdr }))
     }
