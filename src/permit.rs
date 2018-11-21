@@ -5,12 +5,26 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::num::ParseIntError;
 
-pub struct Permit {
+const PERMIT_RECORD_LENGTH: usize = 8 + 8 + 16 + 16 + 16;
+
+pub struct CellPermit {
     pub cell: String,
-    pub date: String,
-    pub edition: String,
+    pub date: NaiveDate,
     pub key1: String,
     pub key2: String,
+}
+
+pub enum SericeLevelIndicator {
+    SubscriptionPermit,
+    SinglePurchasePermit,
+}
+
+pub struct PermitRecord {
+    pub cell_permit: CellPermit,
+    pub sli: SericeLevelIndicator,
+    pub edition: Option<u8>,
+    pub data_server_id: String,
+    pub comment: String,
 }
 
 #[derive(Debug)]
@@ -19,6 +33,8 @@ pub enum E {
     ParseError(usize, String),
     IoErr(io::Error),
     ParseIntErr(ParseIntError),
+    CellPermitTooShort,
+    InvalidSli,
 }
 
 impl From<ParseError> for E {
@@ -51,15 +67,65 @@ pub struct PermitFile<R: Read> {
 pub struct Permits<R: Read>(BufReader<R>);
 
 impl<R: Read> Iterator for Permits<R> {
-    type Item = Permit;
+    type Item = Result<PermitRecord, E>;
 
-    fn next(&mut self) -> Option<Permit> {
-        None
+    // TODO: Take care of the :ENC and :ECS rows
+    fn next(&mut self) -> Option<Result<PermitRecord, E>> {
+        let mut s = String::new();
+        match self.0.read_line(&mut s) {
+            Ok(r) => match r {
+                0 => None,
+                _ => Some(parse_permit(&s)),
+            },
+            Err(e) => Some(Err(e.into())),
+        }
     }
 }
 
-fn parse_permit(s: &str) -> Result<Permit, E> {
-    unimplemented!()
+// parses one ECS row in the PERMIT.TXT file
+fn parse_permit(s: &str) -> Result<PermitRecord, E> {
+    let ss: Vec<&str> = s.split(",").into_iter().collect();
+    if ss.len() != 5 {
+        return Err(E::CellPermitTooShort);
+    }
+    let cell_permit = parse_cell_permit(ss[0])?;
+    let sli = match ss[1] {
+        "0" => SericeLevelIndicator::SubscriptionPermit,
+        "1" => SericeLevelIndicator::SinglePurchasePermit,
+        _ => return Err(E::InvalidSli),
+    };
+    let edition = match ss[2] {
+        "" => None,
+        a => Some(a.parse()?),
+    };
+    let data_server_id = String::from("");
+    let comment = String::from("");
+
+    Ok(PermitRecord {
+        cell_permit,
+        sli,
+        edition,
+        data_server_id,
+        comment,
+    })
+}
+
+// TODO decrypt keys and check chksum
+fn parse_cell_permit(s: &str) -> Result<CellPermit, E> {
+    if s.len() != PERMIT_RECORD_LENGTH {
+        return Err(E::ParseError(1, String::from("")));
+    }
+    let cell = String::from(&s[0..8]);
+    let date = NaiveDate::parse_from_str(&s[8..16], "%Y%m%d")?;
+    let key1 = String::from(&s[16..32]);
+    let key2 = String::from(&s[32..48]);
+    let _chksum = String::from(&s[48..PERMIT_RECORD_LENGTH]);
+    Ok(CellPermit {
+        cell,
+        date,
+        key1,
+        key2,
+    })
 }
 
 impl<R: Read> PermitFile<R> {
@@ -143,8 +209,8 @@ mod tests {
     fn parse_permit() -> Result<(), E> {
         let p_str = "GB61021A200711301F3EC4E525FFFCEC1F3EC4E525FFFCEC3E91E355E4E82D30,0,,GB,";
         let p = super::parse_permit(p_str)?;
-        assert_eq!(p.cell, "GB61021A");
-        assert_eq!(p.date, "20071130");
+        assert_eq!(p.cell_permit.cell, "GB61021A");
+        assert_eq!(p.cell_permit.date, NaiveDate::from_ymd(2007, 11, 30));
         Ok(())
     }
 }
