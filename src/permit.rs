@@ -7,6 +7,7 @@ use std::num::ParseIntError;
 
 const PERMIT_RECORD_LENGTH: usize = 8 + 8 + 16 + 16 + 16;
 
+#[derive(Debug, PartialEq)]
 pub struct CellPermit {
     pub cell: String,
     pub date: NaiveDate,
@@ -14,11 +15,13 @@ pub struct CellPermit {
     pub key2: String,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum SericeLevelIndicator {
     SubscriptionPermit,
     SinglePurchasePermit,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct PermitRecord {
     pub cell_permit: CellPermit,
     pub sli: SericeLevelIndicator,
