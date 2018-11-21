@@ -69,15 +69,20 @@ pub struct Permits<R: Read>(BufReader<R>);
 impl<R: Read> Iterator for Permits<R> {
     type Item = Result<PermitRecord, E>;
 
-    // TODO: Take care of the :ENC and :ECS rows
     fn next(&mut self) -> Option<Result<PermitRecord, E>> {
         let mut s = String::new();
-        match self.0.read_line(&mut s) {
+        let res = match self.0.read_line(&mut s) {
             Ok(r) => match r {
                 0 => None,
                 _ => Some(parse_permit(&s)),
             },
             Err(e) => Some(Err(e.into())),
+        };
+
+        if s.starts_with(":ENC") || s.starts_with(":ECS") {
+            self.next()
+        } else {
+            res
         }
     }
 }
