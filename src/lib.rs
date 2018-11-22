@@ -1,17 +1,13 @@
-extern crate crypto;
-extern crate crc;
-extern crate hex;
 extern crate byteorder;
 extern crate chrono;
+extern crate crc;
+extern crate crypto;
+extern crate hex;
+extern crate zip;
 pub mod up;
 
 pub mod permit;
 
+pub mod decrypter;
+
 mod crypto_support;
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
