@@ -18,25 +18,28 @@ GB1000042007123164B51D24FB77ADB364B51D24FB77ADB3EEA2291965966391,0,,GB,
         md.date,
         NaiveDate::from_ymd(2007, 10, 23).and_hms(10, 20, 0)
     );
-    let cps: Vec<_> = pf.permits().map(|x| x.unwrap()).collect();
+    let cps: Vec<_> = pf
+        .permits(String::from("12345"))
+        .map(|x| x.unwrap())
+        .collect();
     assert_eq!(cps.len(), 3);
     let cps0cp = permit::CellPermit {
         cell: String::from("GB100001"),
         date: chrono::NaiveDate::from_ymd(2007, 12, 31),
-        key1: String::from("517C1E9A4BCF3826"),
-        key2: String::from("517C1E9A4BCF3826"),
+        key1: [54, 62, 171, 50, 198],
+        key2: [54, 62, 171, 50, 198],
     };
     let cps1cp = permit::CellPermit {
         cell: String::from("GB100002"),
         date: chrono::NaiveDate::from_ymd(2007, 12, 31),
-        key1: String::from("BBA63203A5992420"),
-        key2: String::from("BBA63203A5992420"),
+        key1: [73, 74, 128, 79, 106],
+        key2: [73, 74, 128, 79, 106],
     };
     let cps2cp = permit::CellPermit {
         cell: String::from("GB100004"),
         date: chrono::NaiveDate::from_ymd(2007, 12, 31),
-        key1: String::from("64B51D24FB77ADB3"),
-        key2: String::from("64B51D24FB77ADB3"),
+        key1: [89, 44, 236, 217, 52],
+        key2: [89, 44, 236, 217, 52],
     };
     assert_eq!(
         cps[0],

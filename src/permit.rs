@@ -1,5 +1,7 @@
 use chrono::prelude::*;
 use chrono::ParseError;
+use crypto::blowfish::Blowfish;
+use crypto::symmetriccipher::BlockDecryptor;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -11,8 +13,8 @@ const PERMIT_RECORD_LENGTH: usize = 8 + 8 + 16 + 16 + 16;
 pub struct CellPermit {
     pub cell: String,
     pub date: NaiveDate,
-    pub key1: String,
-    pub key2: String,
+    pub key1: [u8; 5],
+    pub key2: [u8; 5],
 }
 
 #[derive(Debug, PartialEq)]
@@ -38,6 +40,7 @@ pub enum E {
     ParseIntErr(ParseIntError),
     CellPermitTooShort,
     InvalidSli,
+    FromHex(hex::FromHexError),
 }
 
 impl From<ParseError> for E {
@@ -58,6 +61,12 @@ impl From<io::Error> for E {
     }
 }
 
+impl From<hex::FromHexError> for E {
+    fn from(e: hex::FromHexError) -> E {
+        E::FromHex(e)
+    }
+}
+
 pub struct MetaData {
     pub date: NaiveDateTime,
     pub version: u8,
@@ -67,7 +76,7 @@ pub struct PermitFile<R: Read> {
     file: BufReader<R>,
 }
 
-pub struct Permits<R: Read>(BufReader<R>);
+pub struct Permits<R: Read>(BufReader<R>, String);
 
 impl<R: Read> Iterator for Permits<R> {
     type Item = Result<PermitRecord, E>;
@@ -77,7 +86,7 @@ impl<R: Read> Iterator for Permits<R> {
         let res = match self.0.read_line(&mut s) {
             Ok(r) => match r {
                 0 => None,
-                _ => Some(parse_permit(&s[..s.len() - 1])),
+                _ => Some(parse_permit(&s[..s.len() - 1], &self.1)),
             },
             Err(e) => Some(Err(e.into())),
         };
@@ -91,12 +100,12 @@ impl<R: Read> Iterator for Permits<R> {
 }
 
 // parses one ECS row in the PERMIT.TXT file
-fn parse_permit(s: &str) -> Result<PermitRecord, E> {
+fn parse_permit(s: &str, key: &str) -> Result<PermitRecord, E> {
     let ss: Vec<&str> = s.split(",").into_iter().collect();
     if ss.len() != 5 {
         return Err(E::CellPermitTooShort);
     }
-    let cell_permit = parse_cell_permit(ss[0])?;
+    let cell_permit = parse_cell_permit(ss[0], key)?;
     let sli = match ss[1] {
         "0" => SericeLevelIndicator::SubscriptionPermit,
         "1" => SericeLevelIndicator::SinglePurchasePermit,
@@ -118,15 +127,14 @@ fn parse_permit(s: &str) -> Result<PermitRecord, E> {
     })
 }
 
-// TODO decrypt keys and check chksum
-fn parse_cell_permit(s: &str) -> Result<CellPermit, E> {
+fn parse_cell_permit(s: &str, key: &str) -> Result<CellPermit, E> {
     if s.len() != PERMIT_RECORD_LENGTH {
         return Err(E::ParseError(1, String::from("")));
     }
     let cell = String::from(&s[0..8]);
     let date = NaiveDate::parse_from_str(&s[8..16], "%Y%m%d")?;
-    let key1 = String::from(&s[16..32]);
-    let key2 = String::from(&s[32..48]);
+    let key1 = decrypt_key(&s[16..32], key)?;
+    let key2 = decrypt_key(&s[32..48], key)?;
     let _chksum = String::from(&s[48..PERMIT_RECORD_LENGTH]);
     Ok(CellPermit {
         cell,
@@ -134,6 +142,14 @@ fn parse_cell_permit(s: &str) -> Result<CellPermit, E> {
         key1,
         key2,
     })
+}
+
+fn decrypt_key<'a>(s: &str, hwid: &str) -> Result<[u8; 5], E> {
+    let key: String = hwid.chars().chain(hwid[0..1].chars()).collect();
+    let crypto = Blowfish::new(key.as_bytes());
+    let mut dec = [0u8; 8];
+    crypto.decrypt_block(hex::decode(s)?.as_slice(), &mut dec);
+    Ok([dec[0], dec[1], dec[2], dec[3], dec[4]])
 }
 
 impl<R: Read> PermitFile<R> {
@@ -148,8 +164,8 @@ impl<R: Read> PermitFile<R> {
         Ok((MetaData { date, version }, PermitFile { file: rdr }))
     }
 
-    pub fn permits(self) -> Permits<R> {
-        Permits(self.file)
+    pub fn permits(self, key: String) -> Permits<R> {
+        Permits(self.file, key)
     }
 }
 
@@ -216,9 +232,19 @@ mod tests {
     #[test]
     fn parse_permit() -> Result<(), E> {
         let p_str = "GB61021A200711301F3EC4E525FFFCEC1F3EC4E525FFFCEC3E91E355E4E82D30,0,,GB,";
-        let p = super::parse_permit(p_str)?;
+        let p = super::parse_permit(p_str, &String::from("12311"))?;
         assert_eq!(p.cell_permit.cell, "GB61021A");
         assert_eq!(p.cell_permit.date, NaiveDate::from_ymd(2007, 11, 30));
+        Ok(())
+    }
+
+    #[test]
+    fn decrypt_key() -> Result<(), E> {
+        let hwid = "12348";
+        let expected_key = "C1CB518E9C";
+        let encrypted_key = "BEB9BFE3C7C6CE68";
+        let decrypted_key = hex::encode_upper(super::decrypt_key(encrypted_key, hwid)?);
+        assert_eq!(decrypted_key, expected_key);
         Ok(())
     }
 }
