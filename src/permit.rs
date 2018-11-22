@@ -2,12 +2,42 @@ use chrono::prelude::*;
 use chrono::ParseError;
 use crypto::blowfish::Blowfish;
 use crypto::symmetriccipher::BlockDecryptor;
+use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::num::ParseIntError;
 
 const PERMIT_RECORD_LENGTH: usize = 8 + 8 + 16 + 16 + 16;
+
+pub trait GetPermit {
+    fn get_permit(&self, cell: &str) -> Option<&PermitRecord>;
+}
+
+impl GetPermit for HashMap<String, PermitRecord> {
+    fn get_permit(&self, cell: &str) -> Option<&PermitRecord> {
+        self.get(cell)
+    }
+}
+
+/// convinience method to get a GetPermit from a reader
+pub fn permit_from_rdr<R: Read>(key: &str, rdr: R) -> Result<impl GetPermit, E> {
+    let mut res = HashMap::new();
+    let (_, f) = PermitFile::new(rdr)?;
+    for permit in f.permits(key.to_string()) {
+        let p = permit?;
+        res.insert(p.cell_permit.cell.clone(), p);
+    }
+    Ok(res)
+}
+
+/// convinience method to get a GetPermit from a file
+pub fn permit_from_file<R: AsRef<std::path::Path>>(
+    key: &str,
+    path: R,
+) -> Result<impl GetPermit, E> {
+    Ok(permit_from_rdr(key, std::fs::File::open(path)?)?)
+}
 
 #[derive(Debug, PartialEq)]
 pub struct CellPermit {
