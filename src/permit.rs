@@ -116,7 +116,7 @@ impl<R: Read> Iterator for Permits<R> {
         let res = match self.0.read_line(&mut s) {
             Ok(r) => match r {
                 0 => None,
-                _ => Some(parse_permit(&s[..s.len() - 1], &self.1)),
+                _ => Some(parse_permit(&s, &self.1)),
             },
             Err(e) => Some(Err(e.into())),
         };
@@ -146,7 +146,7 @@ fn parse_permit(s: &str, key: &str) -> Result<PermitRecord, E> {
         a => Some(a.parse()?),
     };
     let data_server_id = String::from(ss[3]);
-    let comment = String::from(ss[4]);
+    let comment = String::from(ss[4].trim());
 
     Ok(PermitRecord {
         cell_permit,
@@ -187,9 +187,9 @@ impl<R: Read> PermitFile<R> {
         let mut rdr = BufReader::new(rdr);
         let (mut date_str, mut version_str) = (String::new(), String::new());
         rdr.read_line(&mut date_str)?;
-        let date = get_date(&date_str[..date_str.len() - 1])?;
+        let date = get_date(&date_str)?;
         rdr.read_line(&mut version_str)?;
-        let version = get_version(&version_str[..version_str.len() - 1])?;
+        let version = get_version(&version_str)?;
 
         Ok((MetaData { date, version }, PermitFile { file: rdr }))
     }
@@ -200,6 +200,7 @@ impl<R: Read> PermitFile<R> {
 }
 
 fn get_date(l: &str) -> Result<NaiveDateTime, E> {
+    let l = l.trim();
     let l = if l.starts_with(":DATE ") {
         &l[6..]
     } else {
@@ -211,6 +212,7 @@ fn get_date(l: &str) -> Result<NaiveDateTime, E> {
 }
 
 fn get_version(l: &str) -> Result<u8, E> {
+    let l = l.trim();
     let l = if l.starts_with(":VERSION ") {
         &l[9..]
     } else {
@@ -233,6 +235,10 @@ mod tests {
             (
                 ":DATE 19990101",
                 NaiveDate::from_ymd(1999, 1, 1).and_hms(0, 0, 0),
+            ),
+            (
+                ":DATE 20120422 14:11",
+                NaiveDate::from_ymd(2012, 4, 22).and_hms(14, 11, 0),
             ),
         ];
         for (i, a) in tests.iter().enumerate() {
