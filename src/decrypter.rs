@@ -3,15 +3,17 @@ use crypto::symmetriccipher::BlockDecryptor;
 use permit;
 use std::io;
 use std::io::prelude::*;
-use std::io::BufReader;
-use zip::read::{ZipArchive, ZipFile};
+use std::io::{BufReader, Cursor};
+use zip::read::ZipArchive;
 
 pub struct S63Decrypter<P: permit::GetPermit> {
     pub hwid: String,
     pub permit: P,
 }
 
+#[derive(Debug)]
 pub enum E {
+    DecryptionFailed,
     Io(io::Error),
     NoPermit(String),
     NonEightRead,
@@ -35,15 +37,39 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
         S63Decrypter { hwid, permit }
     }
 
-    pub fn decrypt<R: Read + Seek, W: Write>(&self, cell: &str, rdr: R) -> Result<(), E> {
+    pub fn decrypt<R: Read + Seek, W: Write>(
+        &self,
+        cell: &str,
+        rdr: R,
+        mut wtr: W,
+    ) -> Result<(), E> {
         let mut rdr = BufReader::new(rdr);
         let permit = match self.permit.get_permit(cell) {
             Some(val) => val,
             None => return Err(E::NoPermit(String::from(cell))),
         };
-        let mut zipfile = Vec::new();
-        decrypt_into(&permit.cell_permit.key1, &mut rdr, &mut zipfile)?;
-        Ok(())
+        for (i, key) in vec![permit.cell_permit.key1, permit.cell_permit.key2]
+            .into_iter()
+            .enumerate()
+        {
+            let mut zipfile = Vec::new();
+            decrypt_into(&key, &mut rdr, &mut zipfile)?;
+            let mut archive = match ZipArchive::new(Cursor::new(zipfile)) {
+                Ok(archive) => archive,
+                Err(e) => {
+                    if i == 0 {
+                        continue;
+                    } else {
+                        return Err(e.into());
+                    }
+                }
+            };
+            let mut zf = archive.by_index(0)?;
+            std::io::copy(&mut zf, &mut wtr)?;
+            return Ok(());
+        }
+
+        Err(E::DecryptionFailed)
     }
 }
 
