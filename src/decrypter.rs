@@ -7,7 +7,6 @@ use std::io::{BufReader, Cursor};
 use zip::read::ZipArchive;
 
 pub struct S63Decrypter<P: permit::GetPermit> {
-    pub hwid: String,
     pub permit: P,
 }
 
@@ -33,8 +32,8 @@ impl From<zip::result::ZipError> for E {
 }
 
 impl<P: permit::GetPermit> S63Decrypter<P> {
-    pub fn new(hwid: String, permit: P) -> S63Decrypter<P> {
-        S63Decrypter { hwid, permit }
+    pub fn new(permit: P) -> S63Decrypter<P> {
+        S63Decrypter { permit }
     }
 
     pub fn decrypt<R: Read + Seek, W: Write>(
