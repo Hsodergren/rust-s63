@@ -203,7 +203,7 @@ fn permit_chksum(s: &str, key: &str) -> Result<(), E> {
 fn crc32(data: &[u8]) -> [u8; 4] {
     let crc32 = crc32::checksum_ieee(data);
     let mut crc32_arr = [0u8; 4];
-    byteorder::BigEndian::write_u32(&mut crc32_arr, crc32);
+    BigEndian::write_u32(&mut crc32_arr, crc32);
     crc32_arr
 }
 
