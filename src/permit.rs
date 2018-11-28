@@ -26,7 +26,7 @@ impl GetPermit for HashMap<String, PermitRecord> {
 pub fn permit_from_rdr<R: Read>(key: &str, rdr: R) -> Result<impl GetPermit, E> {
     let mut res = HashMap::new();
     let (_, f) = PermitFile::new(rdr)?;
-    for permit in f.permits(key.to_string()) {
+    for permit in f.permits(key) {
         let p = permit?;
         res.insert(p.cell_permit.cell.clone(), p);
     }
@@ -109,9 +109,9 @@ pub struct PermitFile<R: Read> {
     file: BufReader<R>,
 }
 
-pub struct Permits<R: Read>(BufReader<R>, String);
+pub struct Permits<'a, R: Read>(BufReader<R>, &'a str);
 
-impl<R: Read> Iterator for Permits<R> {
+impl<'a, R: Read> Iterator for Permits<'a, R> {
     type Item = Result<PermitRecord, E>;
 
     fn next(&mut self) -> Option<Result<PermitRecord, E>> {
@@ -119,7 +119,7 @@ impl<R: Read> Iterator for Permits<R> {
         let res = match self.0.read_line(&mut s) {
             Ok(r) => match r {
                 0 => None,
-                _ => Some(parse_permit(&s, &self.1)),
+                _ => Some(parse_permit(&s, self.1)),
             },
             Err(e) => Some(Err(e.into())),
         };
@@ -218,7 +218,7 @@ fn decrypt_key<'a>(s: &str, hwid: &str) -> Result<[u8; 5], E> {
     Ok([dec[0], dec[1], dec[2], dec[3], dec[4]])
 }
 
-impl<R: Read> PermitFile<R> {
+impl<'a, R: Read> PermitFile<R> {
     pub fn new(rdr: R) -> Result<(MetaData, PermitFile<R>), E> {
         let mut rdr = BufReader::new(rdr);
         let (mut date_str, mut version_str) = (String::new(), String::new());
@@ -230,7 +230,7 @@ impl<R: Read> PermitFile<R> {
         Ok((MetaData { date, version }, PermitFile { file: rdr }))
     }
 
-    pub fn permits(self, key: String) -> Permits<R> {
+    pub fn permits(self, key: &'a str) -> Permits<'a, R> {
         Permits(self.file, key)
     }
 }

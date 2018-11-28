@@ -18,10 +18,7 @@ GB1000042007123164B51D24FB77ADB364B51D24FB77ADB3EEA2291965966391,0,,GB,
         md.date,
         NaiveDate::from_ymd(2007, 10, 23).and_hms(10, 20, 0)
     );
-    let cps: Vec<_> = pf
-        .permits(String::from("12345"))
-        .map(|x| x.unwrap())
-        .collect();
+    let cps: Vec<_> = pf.permits("12345").map(|x| x.unwrap()).collect();
     assert_eq!(cps.len(), 3);
     let cps0cp = permit::CellPermit {
         cell: String::from("GB100001"),
