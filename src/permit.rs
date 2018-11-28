@@ -180,9 +180,7 @@ fn parse_cell_permit(s: &str, key: &str) -> Result<CellPermit, E> {
 fn permit_chksum(s: &str, key: &str) -> Result<(), E> {
     let (rest, chksum) = (&s[0..48], &s[48..]);
     let chksum = hex::decode(&chksum)?;
-    let crc32 = crc32::checksum_ieee(&rest.as_bytes());
-    let mut crc32_arr = [0u8; 4];
-    byteorder::BigEndian::write_u32(&mut crc32_arr, crc32);
+    let crc32_arr = crc32(rest.as_bytes());
     let mut enc = [0u8; 8];
     let crypto = Blowfish::new(hwid6(key).as_bytes());
     crypto.encrypt_block(
@@ -195,12 +193,18 @@ fn permit_chksum(s: &str, key: &str) -> Result<(), E> {
         &mut enc,
     );
 
-    println!("{:?}|||{:?}", chksum, enc);
     if chksum == enc {
         Ok(())
     } else {
         Err(E::InvalidChksum)
     }
+}
+
+fn crc32(data: &[u8]) -> [u8; 4] {
+    let crc32 = crc32::checksum_ieee(data);
+    let mut crc32_arr = [0u8; 4];
+    byteorder::BigEndian::write_u32(&mut crc32_arr, crc32);
+    crc32_arr
 }
 
 fn hwid6(hwid: &str) -> String {
@@ -300,7 +304,7 @@ mod tests {
     #[test]
     fn parse_permit() -> Result<(), E> {
         let p_str = "GB61021A200711301F3EC4E525FFFCEC1F3EC4E525FFFCEC3E91E355E4E82D30,0,,GB,";
-        let p = super::parse_permit(p_str, &String::from("12311"))?;
+        let p = super::parse_permit(p_str, &String::from("12345"))?;
         assert_eq!(p.cell_permit.cell, "GB61021A");
         assert_eq!(p.cell_permit.date, NaiveDate::from_ymd(2007, 11, 30));
         Ok(())
