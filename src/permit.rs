@@ -1,7 +1,9 @@
+use byteorder::{BigEndian, ByteOrder};
 use chrono::prelude::*;
 use chrono::ParseError;
+use crc::crc32;
 use crypto::blowfish::Blowfish;
-use crypto::symmetriccipher::BlockDecryptor;
+use crypto::symmetriccipher::{BlockDecryptor, BlockEncryptor};
 use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
@@ -70,6 +72,7 @@ pub enum E {
     ParseIntErr(ParseIntError),
     CellPermitTooShort,
     InvalidSli,
+    InvalidChksum,
     FromHex(hex::FromHexError),
 }
 
@@ -161,11 +164,11 @@ fn parse_cell_permit(s: &str, key: &str) -> Result<CellPermit, E> {
     if s.len() != PERMIT_RECORD_LENGTH {
         return Err(E::ParseError(1, String::from("")));
     }
+    permit_chksum(s, key)?;
     let cell = String::from(&s[0..8]);
     let date = NaiveDate::parse_from_str(&s[8..16], "%Y%m%d")?;
     let key1 = decrypt_key(&s[16..32], key)?;
     let key2 = decrypt_key(&s[32..48], key)?;
-    let _chksum = String::from(&s[48..PERMIT_RECORD_LENGTH]);
     Ok(CellPermit {
         cell,
         date,
@@ -174,9 +177,42 @@ fn parse_cell_permit(s: &str, key: &str) -> Result<CellPermit, E> {
     })
 }
 
+fn permit_chksum(s: &str, key: &str) -> Result<(), E> {
+    let (rest, chksum) = (&s[0..48], &s[48..]);
+    let chksum = hex::decode(&chksum)?;
+    let crc32_arr = crc32(rest.as_bytes());
+    let mut enc = [0u8; 8];
+    let crypto = Blowfish::new(hwid6(key).as_bytes());
+    crypto.encrypt_block(
+        crc32_arr
+            .into_iter()
+            .chain([4u8; 4].into_iter())
+            .map(|x| *x)
+            .collect::<Vec<u8>>()
+            .as_slice(),
+        &mut enc,
+    );
+
+    if chksum == enc {
+        Ok(())
+    } else {
+        Err(E::InvalidChksum)
+    }
+}
+
+fn crc32(data: &[u8]) -> [u8; 4] {
+    let crc32 = crc32::checksum_ieee(data);
+    let mut crc32_arr = [0u8; 4];
+    byteorder::BigEndian::write_u32(&mut crc32_arr, crc32);
+    crc32_arr
+}
+
+fn hwid6(hwid: &str) -> String {
+    hwid.chars().chain(hwid[0..1].chars()).collect()
+}
+
 fn decrypt_key<'a>(s: &str, hwid: &str) -> Result<[u8; 5], E> {
-    let key: String = hwid.chars().chain(hwid[0..1].chars()).collect();
-    let crypto = Blowfish::new(key.as_bytes());
+    let crypto = Blowfish::new(hwid6(hwid).as_bytes());
     let mut dec = [0u8; 8];
     crypto.decrypt_block(hex::decode(s)?.as_slice(), &mut dec);
     Ok([dec[0], dec[1], dec[2], dec[3], dec[4]])
@@ -268,7 +304,7 @@ mod tests {
     #[test]
     fn parse_permit() -> Result<(), E> {
         let p_str = "GB61021A200711301F3EC4E525FFFCEC1F3EC4E525FFFCEC3E91E355E4E82D30,0,,GB,";
-        let p = super::parse_permit(p_str, &String::from("12311"))?;
+        let p = super::parse_permit(p_str, &String::from("12345"))?;
         assert_eq!(p.cell_permit.cell, "GB61021A");
         assert_eq!(p.cell_permit.date, NaiveDate::from_ymd(2007, 11, 30));
         Ok(())
