@@ -57,6 +57,8 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
                 Ok(archive) => archive,
                 Err(e) => {
                     if i == 0 {
+                        // roll back the reader to try with next key
+                        rdr.seek(std::io::SeekFrom::Start(0))?;
                         continue;
                     } else {
                         return Err(e.into());
@@ -76,15 +78,61 @@ fn decrypt_into<R: Read, W: Write>(key: &[u8], rdr: &mut R, wtr: &mut W) -> Resu
     let crypto = Blowfish::new(&key);
     let mut enc = [0u8; 8];
     let mut dec = [0u8; 8];
+    let mut first = true;
     loop {
-        match rdr.read(&mut enc)? {
-            8 => {
-                crypto.decrypt_block(&mut enc, &mut dec);
-                wtr.write(&dec)?;
-            }
-            0 => break,
-            _ => return Err(E::NonEightRead),
-        };
+        let b = rdr.read(&mut enc)?;
+        if b == 0 {
+            break;
+        }
+
+        if !first {
+            first = false
+        } else {
+            wtr.write(&dec)?;
+        }
+        crypto.decrypt_block(&enc, &mut dec);
     }
+    wtr.write(depad(&dec))?;
+
     Ok(())
+}
+
+fn depad(data: &[u8]) -> &[u8] {
+    assert!(data.len() == 8);
+    if data[7] > 8 {
+        return data;
+    } else {
+        let last = data[7];
+        for i in 0..last {
+            if data[(7 - i) as usize] != last {
+                return data;
+            }
+        }
+        return &data[..(8 - last) as usize];
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_depad() {
+        let mut data = depad(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(data, [1, 2, 3, 4, 5, 6, 7, 8]);
+
+        data = depad(&[1, 2, 3, 4, 5, 6, 7, 1]);
+        assert_eq!(data, [1, 2, 3, 4, 5, 6, 7]);
+
+        data = depad(&[1, 2, 3, 4, 5, 6, 2, 2]);
+        assert_eq!(data, [1, 2, 3, 4, 5, 6]);
+
+        data = depad(&[1, 2, 3, 4, 5, 6, 2, 2]);
+        assert_eq!(data, [1, 2, 3, 4, 5, 6]);
+
+        data = depad(&[1, 7, 7, 7, 7, 7, 7, 7]);
+        assert_eq!(data, [1]);
+
+        data = depad(&[8, 8, 8, 8, 8, 8, 8, 8]);
+        assert_eq!(data, []);
+    }
 }
