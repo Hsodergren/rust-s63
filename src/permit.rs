@@ -23,7 +23,7 @@ impl GetPermit for HashMap<String, PermitRecord> {
 }
 
 /// convinience method to get a GetPermit from a reader
-pub fn permit_from_rdr<R: Read>(key: &str, rdr: R) -> Result<impl GetPermit, E> {
+pub fn permit_from_rdr<R: Read>(rdr: R, key: &str) -> Result<impl GetPermit, E> {
     let mut res = HashMap::new();
     let (_, f) = PermitFile::new(rdr)?;
     for permit in f.permits(key) {
@@ -35,10 +35,10 @@ pub fn permit_from_rdr<R: Read>(key: &str, rdr: R) -> Result<impl GetPermit, E> 
 
 /// convinience method to get a GetPermit from a file
 pub fn permit_from_file<R: AsRef<std::path::Path>>(
-    key: &str,
     path: R,
+    key: &str,
 ) -> Result<impl GetPermit, E> {
-    Ok(permit_from_rdr(key, std::fs::File::open(path)?)?)
+    Ok(permit_from_rdr(std::fs::File::open(path)?, key)?)
 }
 
 #[derive(Debug, PartialEq)]
