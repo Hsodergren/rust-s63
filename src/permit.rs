@@ -49,6 +49,41 @@ pub struct CellPermit {
     pub key2: [u8; 5],
 }
 
+impl<'a> CellPermit {
+    pub(crate) fn keys(&self) -> Keys {
+        Keys {
+            k1: &self.key1,
+            k2: &self.key2,
+            i: 0,
+        }
+    }
+}
+
+pub(crate) struct Keys<'a> {
+    k1: &'a [u8; 5],
+    k2: &'a [u8; 5],
+    i: u8,
+}
+
+impl<'a> Iterator for Keys<'a> {
+    type Item = &'a [u8; 5];
+
+    fn next(&mut self) -> Option<&'a [u8; 5]> {
+        self.i += 1;
+        if self.i == 1 {
+            Some(self.k1)
+        } else if self.i == 2 {
+            if self.k1 == self.k2 {
+                None
+            } else {
+                Some(self.k2)
+            }
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum SericeLevelIndicator {
     SubscriptionPermit,
@@ -318,5 +353,29 @@ mod tests {
         let decrypted_key = hex::encode_upper(super::decrypt_key(encrypted_key, hwid)?);
         assert_eq!(decrypted_key, expected_key);
         Ok(())
+    }
+
+    #[test]
+    fn keys_iter() {
+        let p = CellPermit {
+            cell: String::from("abc"),
+            date: NaiveDate::from_ymd(2012, 4, 22),
+            key1: [0, 0, 0, 0, 0],
+            key2: [0, 0, 0, 0, 0],
+        };
+        let mut iter = p.keys();
+        assert_eq!(iter.next(), Some(&[0, 0, 0, 0, 0]));
+        assert_eq!(iter.next(), None);
+
+        let p = CellPermit {
+            cell: String::from("abc"),
+            date: NaiveDate::from_ymd(2012, 4, 22),
+            key1: [0, 0, 0, 0, 0],
+            key2: [0, 0, 0, 0, 1],
+        };
+        let mut iter = p.keys();
+        assert_eq!(iter.next(), Some(&[0, 0, 0, 0, 0]));
+        assert_eq!(iter.next(), Some(&[0, 0, 0, 0, 1]));
+        assert_eq!(iter.next(), None);
     }
 }

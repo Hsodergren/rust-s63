@@ -47,23 +47,15 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
             Some(val) => val,
             None => return Err(E::NoPermit(String::from(cell))),
         };
-        for (i, key) in vec![permit.cell_permit.key1, permit.cell_permit.key2]
-            .into_iter()
-            .enumerate()
-        {
+        for (i, key) in permit.cell_permit.keys().enumerate() {
+            if i != 0 {
+                rdr.seek(std::io::SeekFrom::Start(0))?;
+            }
             let mut zipfile = Vec::new();
-            decrypt_into(&key, &mut rdr, &mut zipfile)?;
+            decrypt_into(key, &mut rdr, &mut zipfile)?;
             let mut archive = match ZipArchive::new(Cursor::new(zipfile)) {
                 Ok(archive) => archive,
-                Err(e) => {
-                    if i == 0 {
-                        // roll back the reader to try with next key
-                        rdr.seek(std::io::SeekFrom::Start(0))?;
-                        continue;
-                    } else {
-                        return Err(e.into());
-                    }
-                }
+                Err(_) => continue,
             };
             let mut zf = archive.by_index(0)?;
             std::io::copy(&mut zf, &mut wtr)?;
