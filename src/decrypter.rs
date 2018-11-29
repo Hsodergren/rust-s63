@@ -36,7 +36,7 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
         S63Decrypter { permit }
     }
 
-    pub fn decrypt<R: Read + Seek, W: Write>(
+    pub fn with_cell<R: Read + Seek, W: Write>(
         &self,
         cell: &str,
         rdr: R,
@@ -51,18 +51,25 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
             if i != 0 {
                 rdr.seek(std::io::SeekFrom::Start(0))?;
             }
-            let mut zipfile = Vec::new();
-            decrypt_into(key, &mut rdr, &mut zipfile)?;
-            let mut archive = match ZipArchive::new(Cursor::new(zipfile)) {
-                Ok(archive) => archive,
+            match self.with_key(key, &mut rdr, &mut wtr) {
+                Ok(_) => return Ok(()),
                 Err(_) => continue,
-            };
-            let mut zf = archive.by_index(0)?;
-            std::io::copy(&mut zf, &mut wtr)?;
-            return Ok(());
+            }
         }
 
         Err(E::DecryptionFailed)
+    }
+
+    pub fn with_key<R: Read, W: Write>(&self, key: &[u8], mut rdr: R, mut wtr: W) -> Result<(), E> {
+        let mut zipfile = Vec::new();
+        decrypt_into(key, &mut rdr, &mut zipfile)?;
+        let mut archive = match ZipArchive::new(Cursor::new(zipfile)) {
+            Ok(archive) => archive,
+            Err(_) => return Err(E::DecryptionFailed),
+        };
+        let mut zf = archive.by_index(0)?;
+        std::io::copy(&mut zf, &mut wtr)?;
+        Ok(())
     }
 }
 
