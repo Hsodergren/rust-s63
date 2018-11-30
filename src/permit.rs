@@ -16,6 +16,15 @@ pub trait GetPermit {
     fn get_permit(&self, cell: &str) -> Option<&PermitRecord>;
 }
 
+#[doc(hidden)]
+pub(crate) struct EmptyPermit();
+
+impl GetPermit for EmptyPermit {
+    fn get_permit(&self, _cell: &str) -> Option<&PermitRecord> {
+        None
+    }
+}
+
 impl GetPermit for HashMap<String, PermitRecord> {
     fn get_permit(&self, cell: &str) -> Option<&PermitRecord> {
         self.get(cell)

@@ -7,7 +7,7 @@ use std::io::{BufReader, Cursor};
 use zip::read::ZipArchive;
 
 pub struct S63Decrypter<P: permit::GetPermit> {
-    pub permit: Option<P>,
+    pub permit: P,
 }
 
 #[derive(Debug)]
@@ -33,14 +33,14 @@ impl From<zip::result::ZipError> for E {
 }
 
 impl<P: permit::GetPermit> S63Decrypter<P> {
-    pub fn new() -> S63Decrypter<P> {
-        S63Decrypter { permit: None }
+    pub fn new() -> S63Decrypter<impl permit::GetPermit> {
+        S63Decrypter {
+            permit: permit::EmptyPermit(),
+        }
     }
 
     pub fn new_with_permit(permit: P) -> S63Decrypter<P> {
-        S63Decrypter {
-            permit: Some(permit),
-        }
+        S63Decrypter { permit: permit }
     }
 
     pub fn with_cell<R: Read + Seek, W: Write>(
@@ -49,27 +49,22 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
         rdr: R,
         mut wtr: W,
     ) -> Result<(), E> {
-        match self.permit {
-            None => return Err(E::PermitIsNone),
-            Some(ref p) => {
-                let mut rdr = BufReader::new(rdr);
-                let permit = match p.get_permit(cell) {
-                    Some(val) => val,
-                    None => return Err(E::NoPermit(String::from(cell))),
-                };
-                for (i, key) in permit.cell_permit.keys().enumerate() {
-                    if i != 0 {
-                        rdr.seek(std::io::SeekFrom::Start(0))?;
-                    }
-                    match self.with_key(key, &mut rdr, &mut wtr) {
-                        Ok(_) => return Ok(()),
-                        Err(_) => continue,
-                    }
-                }
-
-                Err(E::DecryptionFailed)
+        let mut rdr = BufReader::new(rdr);
+        let permit = match self.permit.get_permit(cell) {
+            Some(val) => val,
+            None => return Err(E::NoPermit(String::from(cell))),
+        };
+        for (i, key) in permit.cell_permit.keys().enumerate() {
+            if i != 0 {
+                rdr.seek(std::io::SeekFrom::Start(0))?;
+            }
+            match self.with_key(key, &mut rdr, &mut wtr) {
+                Ok(_) => return Ok(()),
+                Err(_) => continue,
             }
         }
+
+        Err(E::DecryptionFailed)
     }
 
     pub fn with_key<R: Read, W: Write>(&self, key: &[u8], mut rdr: R, mut wtr: W) -> Result<(), E> {
