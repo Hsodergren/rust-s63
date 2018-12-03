@@ -33,7 +33,7 @@ impl From<zip::result::ZipError> for E {
 }
 
 impl<P: permit::GetPermit> S63Decrypter<P> {
-    pub fn new() -> S63Decrypter<impl permit::GetPermit> {
+    pub fn new() -> S63Decrypter<permit::EmptyPermit> {
         S63Decrypter {
             permit: permit::EmptyPermit(),
         }
@@ -77,6 +77,27 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
         let mut zf = archive.by_index(0)?;
         std::io::copy(&mut zf, &mut wtr)?;
         Ok(())
+    }
+
+    pub fn with_key_bytes<D: AsRef<[u8]>>(&self, key: &[u8], data: D) -> Result<Vec<u8>, E> {
+        let mut res = Vec::new();
+        let mut rdr = Cursor::new(data);
+        self.with_key(key, &mut rdr, &mut res)?;
+        Ok(res)
+    }
+
+    pub fn with_cell_bytes<D: AsRef<[u8]>>(&self, cell: &str, data: D) -> Result<Vec<u8>, E> {
+        let mut res = Vec::new();
+        let mut rdr = Cursor::new(data);
+        self.with_cell(cell, &mut rdr, &mut res)?;
+        Ok(res)
+    }
+
+    pub fn can_decrypt<D: AsRef<[u8]>>(&self, key: &[u8], data: D) -> bool {
+        match self.with_key_bytes(key, data) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 }
 

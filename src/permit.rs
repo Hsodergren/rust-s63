@@ -16,8 +16,7 @@ pub trait GetPermit {
     fn get_permit(&self, cell: &str) -> Option<&PermitRecord>;
 }
 
-#[doc(hidden)]
-pub(crate) struct EmptyPermit();
+pub struct EmptyPermit();
 
 impl GetPermit for EmptyPermit {
     fn get_permit(&self, _cell: &str) -> Option<&PermitRecord> {
