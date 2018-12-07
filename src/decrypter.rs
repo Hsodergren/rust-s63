@@ -7,7 +7,7 @@ use std::io::{BufReader, Cursor};
 use zip::read::ZipArchive;
 
 pub struct S63Decrypter<P: permit::GetPermit> {
-    pub permit: Option<P>,
+    pub permit: P,
 }
 
 #[derive(Debug)]
@@ -33,14 +33,14 @@ impl From<zip::result::ZipError> for E {
 }
 
 impl<P: permit::GetPermit> S63Decrypter<P> {
-    pub fn new() -> S63Decrypter<P> {
-        S63Decrypter { permit: None }
+    pub fn new() -> S63Decrypter<permit::EmptyPermit> {
+        S63Decrypter {
+            permit: permit::EmptyPermit(),
+        }
     }
 
     pub fn new_with_permit(permit: P) -> S63Decrypter<P> {
-        S63Decrypter {
-            permit: Some(permit),
-        }
+        S63Decrypter { permit: permit }
     }
 
     pub fn with_cell<R: Read + Seek, W: Write>(
@@ -49,27 +49,22 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
         rdr: R,
         mut wtr: W,
     ) -> Result<(), E> {
-        match self.permit {
-            None => return Err(E::PermitIsNone),
-            Some(ref p) => {
-                let mut rdr = BufReader::new(rdr);
-                let permit = match p.get_permit(cell) {
-                    Some(val) => val,
-                    None => return Err(E::NoPermit(String::from(cell))),
-                };
-                for (i, key) in permit.cell_permit.keys().enumerate() {
-                    if i != 0 {
-                        rdr.seek(std::io::SeekFrom::Start(0))?;
-                    }
-                    match self.with_key(key, &mut rdr, &mut wtr) {
-                        Ok(_) => return Ok(()),
-                        Err(_) => continue,
-                    }
-                }
-
-                Err(E::DecryptionFailed)
+        let mut rdr = BufReader::new(rdr);
+        let permit = match self.permit.get_permit(cell) {
+            Some(val) => val,
+            None => return Err(E::NoPermit(String::from(cell))),
+        };
+        for (i, key) in permit.cell_permit.keys().enumerate() {
+            if i != 0 {
+                rdr.seek(std::io::SeekFrom::Start(0))?;
+            }
+            match self.with_key(key, &mut rdr, &mut wtr) {
+                Ok(_) => return Ok(()),
+                Err(_) => continue,
             }
         }
+
+        Err(E::DecryptionFailed)
     }
 
     pub fn with_key<R: Read, W: Write>(&self, key: &[u8], mut rdr: R, mut wtr: W) -> Result<(), E> {
@@ -82,6 +77,27 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
         let mut zf = archive.by_index(0)?;
         std::io::copy(&mut zf, &mut wtr)?;
         Ok(())
+    }
+
+    pub fn with_key_bytes<D: AsRef<[u8]>>(&self, key: &[u8], data: D) -> Result<Vec<u8>, E> {
+        let mut res = Vec::new();
+        let mut rdr = Cursor::new(data);
+        self.with_key(key, &mut rdr, &mut res)?;
+        Ok(res)
+    }
+
+    pub fn with_cell_bytes<D: AsRef<[u8]>>(&self, cell: &str, data: D) -> Result<Vec<u8>, E> {
+        let mut res = Vec::new();
+        let mut rdr = Cursor::new(data);
+        self.with_cell(cell, &mut rdr, &mut res)?;
+        Ok(res)
+    }
+
+    pub fn can_decrypt<D: AsRef<[u8]>>(&self, key: &[u8], data: D) -> bool {
+        match self.with_key_bytes(key, data) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 }
 
