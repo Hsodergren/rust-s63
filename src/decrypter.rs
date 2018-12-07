@@ -1,6 +1,6 @@
 use crypto::blowfish::Blowfish;
 use crypto::symmetriccipher::BlockDecryptor;
-use permit;
+use crate::permit;
 use std::io;
 use std::io::prelude::*;
 use std::io::{BufReader, Cursor};
