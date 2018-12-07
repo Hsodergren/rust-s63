@@ -24,7 +24,7 @@ impl GetPermit for EmptyPermit {
     }
 }
 
-impl GetPermit for HashMap<String, PermitRecord> {
+impl<S: ::std::hash::BuildHasher> GetPermit for HashMap<String, PermitRecord, S> {
     fn get_permit(&self, cell: &str) -> Option<&PermitRecord> {
         self.get(cell)
     }
@@ -177,7 +177,7 @@ impl<'a, R: Read> Iterator for Permits<'a, R> {
 
 // parses one ECS row in the PERMIT.TXT file
 fn parse_permit(s: &str, key: &str) -> Result<PermitRecord, E> {
-    let ss: Vec<&str> = s.split(",").into_iter().collect();
+    let ss: Vec<&str> = s.split(',').collect();
     if ss.len() != 5 {
         return Err(E::CellPermitTooShort);
     }
@@ -230,7 +230,7 @@ fn permit_chksum(s: &str, key: &str) -> Result<(), E> {
         crc32_arr
             .into_iter()
             .chain([4u8; 4].into_iter())
-            .map(|x| *x)
+            .cloned()
             .collect::<Vec<u8>>()
             .as_slice(),
         &mut enc,
@@ -254,7 +254,7 @@ fn hwid6(hwid: &str) -> String {
     hwid.chars().chain(hwid[0..1].chars()).collect()
 }
 
-fn decrypt_key<'a>(s: &str, hwid: &str) -> Result<[u8; 5], E> {
+fn decrypt_key(s: &str, hwid: &str) -> Result<[u8; 5], E> {
     let crypto = Blowfish::new(hwid6(hwid).as_bytes());
     let mut dec = [0u8; 8];
     crypto.decrypt_block(hex::decode(s)?.as_slice(), &mut dec);
@@ -287,7 +287,7 @@ fn get_date(l: &str) -> Result<NaiveDateTime, E> {
     };
 
     Ok(NaiveDateTime::parse_from_str(l, "%Y%m%d %H:%M")
-        .or(NaiveDate::parse_from_str(l, "%Y%m%d").map(|x| x.and_hms(0, 0, 0)))?)
+        .or_else(|_| NaiveDate::parse_from_str(l, "%Y%m%d").map(|x| x.and_hms(0, 0, 0)))?)
 }
 
 fn get_version(l: &str) -> Result<u8, E> {

@@ -40,7 +40,7 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
     }
 
     pub fn new_with_permit(permit: P) -> S63Decrypter<P> {
-        S63Decrypter { permit: permit }
+        S63Decrypter { permit }
     }
 
     pub fn with_cell<R: Read + Seek, W: Write>(
@@ -94,10 +94,7 @@ impl<P: permit::GetPermit> S63Decrypter<P> {
     }
 
     pub fn can_decrypt<D: AsRef<[u8]>>(&self, key: &[u8], data: D) -> bool {
-        match self.with_key_bytes(key, data) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        self.with_key_bytes(key, data).is_ok()
     }
 }
 
@@ -115,11 +112,11 @@ fn decrypt_into<R: Read, W: Write>(key: &[u8], rdr: &mut R, wtr: &mut W) -> Resu
         if !first {
             first = false
         } else {
-            wtr.write(&dec)?;
+            wtr.write_all(&dec)?;
         }
         crypto.decrypt_block(&enc, &mut dec);
     }
-    wtr.write(depad(&dec))?;
+    wtr.write_all(depad(&dec))?;
 
     Ok(())
 }
@@ -127,7 +124,7 @@ fn decrypt_into<R: Read, W: Write>(key: &[u8], rdr: &mut R, wtr: &mut W) -> Resu
 fn depad(data: &[u8]) -> &[u8] {
     assert!(data.len() == 8);
     if data[7] > 8 {
-        return data;
+        data
     } else {
         let last = data[7];
         for i in 0..last {
@@ -135,7 +132,7 @@ fn depad(data: &[u8]) -> &[u8] {
                 return data;
             }
         }
-        return &data[..(8 - last) as usize];
+        &data[..(8 - last) as usize]
     }
 }
 

@@ -78,11 +78,9 @@ impl UserPermit {
 
 // returns true if c is a valid hexadecimal character else false
 fn is_hex(c: char) -> bool {
-    if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
-        true
-    } else {
-        false
-    }
+    (c >= '0' && c <= '9') || 
+    (c >= 'a' && c <= 'f') || 
+    (c >= 'A' && c <= 'F')
 }
 
 // checks length of string and that all characters are valid hex
