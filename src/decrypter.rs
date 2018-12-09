@@ -1,6 +1,6 @@
+use crate::permit;
 use crypto::blowfish::Blowfish;
 use crypto::symmetriccipher::BlockDecryptor;
-use crate::permit;
 use std::io;
 use std::io::prelude::*;
 use std::io::{BufReader, Cursor};
@@ -32,13 +32,15 @@ impl From<zip::result::ZipError> for E {
     }
 }
 
-impl<P: permit::GetPermit> S63Decrypter<P> {
+impl S63Decrypter<permit::EmptyPermit> {
     pub fn new() -> S63Decrypter<permit::EmptyPermit> {
         S63Decrypter {
             permit: permit::EmptyPermit(),
         }
     }
+}
 
+impl<P: permit::GetPermit> S63Decrypter<P> {
     pub fn new_with_permit(permit: P) -> S63Decrypter<P> {
         S63Decrypter { permit }
     }
