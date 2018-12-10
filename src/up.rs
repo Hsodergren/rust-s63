@@ -77,9 +77,10 @@ impl UserPermit {
 }
 
 // returns true if c is a valid hexadecimal character else false
+#[rustfmt::skip]
 fn is_hex(c: char) -> bool {
-    (c >= '0' && c <= '9') || 
-    (c >= 'a' && c <= 'f') || 
+    (c >= '0' && c <= '9') ||
+    (c >= 'a' && c <= 'f') ||
     (c >= 'A' && c <= 'F')
 }
 
