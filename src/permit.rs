@@ -57,7 +57,7 @@ pub struct CellPermit {
     pub key2: [u8; 5],
 }
 
-impl<'a> CellPermit {
+impl CellPermit {
     pub(crate) fn keys(&self) -> Keys {
         Keys {
             k1: &self.key1,
@@ -177,22 +177,19 @@ impl<'a, R: Read> Iterator for Permits<'a, R> {
 
 // parses one ECS row in the PERMIT.TXT file
 fn parse_permit(s: &str, key: &str) -> Result<PermitRecord, E> {
-    let ss: Vec<&str> = s.split(',').collect();
-    if ss.len() != 5 {
-        return Err(E::CellPermitTooShort);
-    }
-    let cell_permit = parse_cell_permit(ss[0], key)?;
-    let sli = match ss[1] {
+    let mut ss = s.split(',');
+    let cell_permit = parse_cell_permit(ss.next().ok_or(E::CellPermitTooShort)?, key)?;
+    let sli = match ss.next().ok_or(E::CellPermitTooShort)? {
         "0" => SericeLevelIndicator::SubscriptionPermit,
         "1" => SericeLevelIndicator::SinglePurchasePermit,
         _ => return Err(E::InvalidSli),
     };
-    let edition = match ss[2] {
+    let edition = match ss.next().ok_or(E::CellPermitTooShort)? {
         "" => None,
         a => Some(a.parse()?),
     };
-    let data_server_id = String::from(ss[3]);
-    let comment = String::from(ss[4].trim());
+    let data_server_id = String::from(ss.next().ok_or(E::CellPermitTooShort)?);
+    let comment = String::from(ss.next().ok_or(E::CellPermitTooShort)?.trim());
 
     Ok(PermitRecord {
         cell_permit,
