@@ -9,6 +9,7 @@ use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::num::ParseIntError;
+use std::str::FromStr;
 
 const PERMIT_RECORD_LENGTH: usize = 8 + 8 + 16 + 16 + 16;
 
@@ -98,6 +99,17 @@ pub enum SericeLevelIndicator {
     SinglePurchasePermit,
 }
 
+impl FromStr for SericeLevelIndicator {
+    type Err = E;
+    fn from_str(s: &str) -> Result<SericeLevelIndicator, Self::Err> {
+        match s {
+            "0" => Ok(SericeLevelIndicator::SubscriptionPermit),
+            "1" => Ok(SericeLevelIndicator::SinglePurchasePermit),
+            _ => Err(E::InvalidSli),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct PermitRecord {
     pub cell_permit: CellPermit,
@@ -179,11 +191,7 @@ impl<'a, R: Read> Iterator for Permits<'a, R> {
 fn parse_permit(s: &str, key: &str) -> Result<PermitRecord, E> {
     let mut ss = s.split(',');
     let cell_permit = parse_cell_permit(ss.next().ok_or(E::CellPermitTooShort)?, key)?;
-    let sli = match ss.next().ok_or(E::CellPermitTooShort)? {
-        "0" => SericeLevelIndicator::SubscriptionPermit,
-        "1" => SericeLevelIndicator::SinglePurchasePermit,
-        _ => return Err(E::InvalidSli),
-    };
+    let sli = ss.next().ok_or(E::CellPermitTooShort)?.parse()?;
     let edition = match ss.next().ok_or(E::CellPermitTooShort)? {
         "" => None,
         a => Some(a.parse()?),
