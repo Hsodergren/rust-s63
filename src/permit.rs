@@ -233,8 +233,8 @@ fn permit_chksum(s: &str, key: &str) -> Result<(), E> {
     let crypto = Blowfish::new(hwid6(key).as_bytes());
     crypto.encrypt_block(
         crc32_arr
-            .into_iter()
-            .chain([4u8; 4].into_iter())
+            .iter()
+            .chain([4u8; 4].iter())
             .cloned()
             .collect::<Vec<u8>>()
             .as_slice(),

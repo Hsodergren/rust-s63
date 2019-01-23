@@ -40,6 +40,12 @@ impl S63Decrypter<permit::EmptyPermit> {
     }
 }
 
+impl Default for S63Decrypter<permit::EmptyPermit> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<P: permit::GetPermit> S63Decrypter<P> {
     pub fn new_with_permit(permit: P) -> S63Decrypter<P> {
         S63Decrypter { permit }

@@ -65,7 +65,7 @@ impl UserPermit {
         let c = Blowfish::new(key.as_bytes());
         let enc = &mut [0u8; 8];
         let mut data: Vec<u8> = Vec::with_capacity(8);
-        data.extend(self.hwid.as_bytes().iter().chain([3u8; 3].into_iter()));
+        data.extend(self.hwid.as_bytes().iter().chain([3u8; 3].iter()));
         c.encrypt_block(data.as_slice(), enc);
         let enc_hwid = hex::encode_upper(enc);
         let mut w = Vec::with_capacity(4);
