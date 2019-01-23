@@ -196,8 +196,8 @@ fn parse_permit(s: &str, key: &str) -> Result<PermitRecord, E> {
         "" => None,
         a => Some(a.parse()?),
     };
-    let data_server_id = String::from(ss.next().ok_or(E::CellPermitTooShort)?);
-    let comment = String::from(ss.next().ok_or(E::CellPermitTooShort)?.trim());
+    let data_server_id = ss.next().ok_or(E::CellPermitTooShort).map(String::from)?;
+    let comment = ss.next().ok_or(E::CellPermitTooShort)?.trim().to_string();
 
     Ok(PermitRecord {
         cell_permit,
