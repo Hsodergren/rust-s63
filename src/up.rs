@@ -1,6 +1,6 @@
 //! Package for handling user permits, both creating and decrypting
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use crc;
 use crypto::blowfish::Blowfish;
 use crypto::symmetriccipher::BlockDecryptor;
@@ -20,6 +20,13 @@ pub enum PermitErr {
     WrongLength(usize, usize),
     HashMisMatch,
     HexErr(hex::FromHexError),
+    Utf8Err(std::str::Utf8Error),
+}
+
+impl From<std::str::Utf8Error> for PermitErr {
+    fn from(e: std::str::Utf8Error) -> PermitErr {
+        PermitErr::Utf8Err(e)
+    }
 }
 
 impl From<hex::FromHexError> for PermitErr {
@@ -64,15 +71,16 @@ impl UserPermit {
         validator(key, KEY_LENGTH)?;
         let c = Blowfish::new(key.as_bytes());
         let enc = &mut [0u8; 8];
-        let mut data: Vec<u8> = Vec::with_capacity(8);
-        data.extend(self.hwid.as_bytes().iter().chain([3u8; 3].iter()));
-        c.encrypt_block(data.as_slice(), enc);
+        let dec = &mut [0u8; 8];
+        dec[0..5].copy_from_slice(self.hwid.as_bytes());
+        dec[5] = 3;
+        dec[6] = 3;
+        dec[7] = 3;
+        c.encrypt_block(dec, enc);
         let enc_hwid = hex::encode_upper(enc);
-        let mut w = Vec::with_capacity(4);
-        w.write_u32::<BigEndian>(crc::crc32::checksum_ieee(enc_hwid.as_bytes()))
-            .unwrap();
-        let chksum = hex::encode_upper(w.as_slice());
-        Ok(enc_hwid + &chksum + &self.id)
+        let chksum = &mut [0u8; 4];
+        chksum.copy_from_slice(&crc::crc32::checksum_ieee(enc_hwid.as_bytes()).to_be_bytes());
+        Ok(enc_hwid + &hex::encode_upper(chksum) + &self.id)
     }
 }
 
