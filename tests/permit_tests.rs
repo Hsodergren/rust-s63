@@ -5,7 +5,7 @@ use chrono::prelude::*;
 use rust_s63::permit;
 
 #[test]
-fn read_permit_file() -> Result<(), permit::E> {
+fn read_permit_file() -> Result<(), failure::Error> {
     let s = r":DATE 20071023 10:20
 :VERSION 2
 :ENC

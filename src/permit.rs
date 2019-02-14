@@ -1,13 +1,11 @@
+use crate::errors::E;
 use chrono::prelude::*;
-use chrono::ParseError;
 use crc::crc32;
 use crypto::blowfish::Blowfish;
 use crypto::symmetriccipher::{BlockDecryptor, BlockEncryptor};
 use std::collections::HashMap;
-use std::io;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::num::ParseIntError;
 use std::str::FromStr;
 
 const PERMIT_RECORD_LENGTH: usize = 8 + 8 + 16 + 16 + 16;
@@ -118,42 +116,6 @@ pub struct PermitRecord {
     pub comment: String,
 }
 
-#[derive(Debug)]
-pub enum E {
-    InvalidDate(ParseError),
-    ParseError(usize, String),
-    IoErr(io::Error),
-    ParseIntErr(ParseIntError),
-    CellPermitTooShort,
-    InvalidSli,
-    InvalidChksum,
-    FromHex(hex::FromHexError),
-}
-
-impl From<ParseError> for E {
-    fn from(e: ParseError) -> E {
-        E::InvalidDate(e)
-    }
-}
-
-impl From<ParseIntError> for E {
-    fn from(e: ParseIntError) -> E {
-        E::ParseIntErr(e)
-    }
-}
-
-impl From<io::Error> for E {
-    fn from(e: io::Error) -> E {
-        E::IoErr(e)
-    }
-}
-
-impl From<hex::FromHexError> for E {
-    fn from(e: hex::FromHexError) -> E {
-        E::FromHex(e)
-    }
-}
-
 pub struct MetaData {
     pub date: NaiveDateTime,
     pub version: u8,
@@ -209,11 +171,12 @@ fn parse_permit(s: &str, key: &str) -> Result<PermitRecord, E> {
 
 fn parse_cell_permit(s: &str, key: &str) -> Result<CellPermit, E> {
     if s.len() != PERMIT_RECORD_LENGTH {
-        return Err(E::ParseError(1, String::from("")));
+        return Err(E::ParseCellPermit(crate::errors::CPReason::Length(s.len())));
     }
     permit_chksum(s, key)?;
     let cell = String::from(&s[0..8]);
-    let date = NaiveDate::parse_from_str(&s[8..16], "%Y%m%d")?;
+    let date = NaiveDate::parse_from_str(&s[8..16], "%Y%m%d")
+        .map_err(|e| E::ParseCellPermit(crate::errors::CPReason::Date(e)))?;
     let key1 = decrypt_key(&s[16..32], key)?;
     let key2 = decrypt_key(&s[32..48], key)?;
     Ok(CellPermit {
@@ -284,7 +247,7 @@ fn get_date(l: &str) -> Result<NaiveDateTime, E> {
     let l = if l.starts_with(":DATE ") {
         &l[6..]
     } else {
-        return Err(E::ParseError(1, l.to_owned()));
+        return Err(E::ParseDateError(l.to_owned()));
     };
 
     Ok(NaiveDateTime::parse_from_str(l, "%Y%m%d %H:%M")
@@ -296,9 +259,8 @@ fn get_version(l: &str) -> Result<u8, E> {
     let l = if l.starts_with(":VERSION ") {
         &l[9..]
     } else {
-        return Err(E::ParseError(2, l.to_owned()));
+        return Err(E::ParseVersionError(l.to_owned()));
     };
-
     Ok(l.parse()?)
 }
 

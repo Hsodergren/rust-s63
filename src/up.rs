@@ -17,7 +17,7 @@ pub enum PermitErr {
     // the length of the hwid
     NonHex,
     // the length of the hwid
-    WrongLength(usize, usize),
+    WrongLength { actual: usize, expected: usize },
     HashMisMatch,
     HexErr(hex::FromHexError),
     Utf8Err(std::str::Utf8Error),
@@ -95,7 +95,10 @@ fn is_hex(c: char) -> bool {
 // checks length of string and that all characters are valid hex
 fn validator(a: &str, l: usize) -> Result<(), PermitErr> {
     if a.len() != l {
-        return Err(PermitErr::WrongLength(a.len(), l));
+        return Err(PermitErr::WrongLength {
+            actual: a.len(),
+            expected: l,
+        });
     }
     if !a.chars().all(is_hex) {
         return Err(PermitErr::NonHex);
