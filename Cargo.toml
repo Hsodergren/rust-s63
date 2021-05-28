@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 rust-crypto = "0.2.36"
-crc = "1.8.1"
+crc = "2.0.0"
 hex = "0.4.2"
 zip = "0.5.0"
 byteorder = "1.2.7"
